@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AP Forecast Intelligence — dashboard + Genie</title>
+    <link rel="stylesheet" href="side-by-side.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">Sole · side-by-side demo</p>
+        <h1>AP Forecast Intelligence</h1>
+        <p class="lead">
+          Left: <strong>Daniel’s Net Sales dashboard</strong> (prod Lakeview by default). Right:
+          <strong>AP Forecast Intelligence Genie</strong> (UAT room). Sign in to Sole once;
+          if embeds are blank, use the open links (Databricks often blocks off-site iframes).
+        </p>
+        <p class="param-hint" id="param-hint"></p>
+      </div>
+      <nav class="actions" aria-label="Open in new tabs">
+        <a id="dash-open" href="#" target="_blank" rel="noopener">Open dashboard</a>
+        <a id="genie-open" href="#" target="_blank" rel="noopener">Open Genie</a>
+        <a href="index.html">Synthetic prototype</a>
+      </nav>
+    </header>
+
+    <main class="split" aria-label="Dashboard and Genie">
+      <section class="pane">
+        <h2>Forecast dashboard</h2>
+        <p class="pane-meta" id="dash-meta">Loading…</p>
+        <iframe
+          id="dash-frame"
+          title="AP Forecasting Net Sales Dashboard"
+          loading="lazy"
+        ></iframe>
+      </section>
+      <section class="pane">
+        <h2>Forecast assistant (Genie)</h2>
+        <p class="pane-meta">Room AP Forecast Intelligence · UAT star schema</p>
+        <iframe
+          id="genie-frame"
+          title="AP Forecast Intelligence Genie"
+          loading="lazy"
+        ></iframe>
+      </section>
+    </main>
+    <script src="side-by-side.js"></script>
+  </body>
+</html>

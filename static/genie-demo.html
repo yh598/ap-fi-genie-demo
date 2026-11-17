@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AP Forecast Intelligence — Genie demo</title>
+    <link rel="stylesheet" href="genie-demo.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">North America · HO2026 UAT preview</p>
+        <h1>AP Forecast Intelligence — marketplace dashboard + assistant</h1>
+        <p class="lead">
+          Lakeview-style midlevel and style-color views with governed Genie chat. On Render, chat
+          uses <code>POST /api/chat</code> (Claude via Databricks serving when not in
+          <code>DEMO_MODE=public</code>).
+        </p>
+      </div>
+      <div class="badges">
+        <span class="badge">HO2026 · North America</span>
+        <span class="badge profile-chip" id="demand-profile">Stable</span>
+      </div>
+    </header>
+    <main class="split">
+      <section class="pane-dash" aria-label="Synthetic dashboard">
+        <div class="dash-toolbar">
+          <span>Workspace: <strong>Forecast Intelligence · NA</strong></span>
+          <span>Last refreshed: synthetic · Nov 2026</span>
+        </div>
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="midlevel" role="tab">Midlevel</button>
+          <button type="button" class="tab" data-tab="style_color" role="tab">Style Color</button>
+        </div>
+        <div class="filters" id="filter-row" aria-label="Segment filters"></div>
+        <div class="kpi-row" id="kpi-row"></div>
+        <article class="card">
+          <h2 id="dash-title">Vomero · US · NDDC</h2>
+          <p class="meta" id="dash-meta">Mid-level · HO2026</p>
+          <div id="midlevel-block">
+            <div class="chart-panel">
+              <div class="legend">
+                <span>■ Actual (settled weeks)</span>
+                <span>■ Forecast (forward weeks)</span>
+              </div>
+              <div class="chart-bars" id="weekly-chart"></div>
+            </div>
+            <div class="weekly-table" id="weekly-table" aria-label="Recent weekly actuals and forecast"></div>
+          </div>
+          <div id="style-color-block" hidden>
+            <p class="meta">Monthly seasonality index (synthetic)</p>
+            <div class="season-grid" id="season-grid"></div>
+          </div>
+        </article>
+      </section>
+      <aside class="pane-chat" aria-label="Forecast assistant">
+        <div class="chat-header"><h2>Forecast assistant</h2></div>
+        <div class="chips" id="prompt-chips"></div>
+        <div class="thread" id="chat-thread"></div>
+        <form class="composer" id="chat-form">
+          <input id="chat-input" placeholder="Ask your question…" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </aside>
+    </main>
+    <script src="genie-demo.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+# Blueprint: connect this repo in Render with root directory poc/ap-forecast-intelligence-ui
+services:
+  - type: web
+    name: ap-forecast-intelligence-ui
+    runtime: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABRICKS_HOST
+        value: https://nike-sole-react.cloud.databricks.com
+      - key: DATABRICKS_CLAUDE_ENDPOINT
+        value: databricks-claude-opus-4-7
+      - key: DEMO_MODE
+        value: public
+      - key: DATABRICKS_TOKEN
+        sync: false
+      - key: DATABRICKS_CLIENT_ID
+        sync: false
+      - key: DATABRICKS_CLIENT_SECRET
+        sync: false
+      - key: HOST
+        value: 0.0.0.0
