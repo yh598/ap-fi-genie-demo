@@ -12,9 +12,7 @@ services:
       - key: DATABRICKS_CLAUDE_ENDPOINT
         value: databricks-claude-opus-4-7
       - key: DEMO_MODE
-        value: workers
-      - key: WORKERS_CHAT_URL
-        value: https://ap-fi-genie-chat.huyun0317.workers.dev
+        value: "off"
       - key: DATABRICKS_TOKEN
         sync: false
       - key: DATABRICKS_CLIENT_ID
