@@ -7,13 +7,18 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_PORT = int(os.getenv("PORT", "8000"))
-DEMO_MODE = os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "public", "yes")
+_CHAT_MODE = os.getenv("DEMO_MODE", "").strip().lower()
+DEMO_MODE = _CHAT_MODE in ("1", "true", "public", "yes")
+WORKERS_MODE = _CHAT_MODE in ("workers", "workers_ai", "cloudflare")
+WORKERS_CHAT_URL = os.getenv("WORKERS_CHAT_URL", "").strip()
 DEFAULT_ENDPOINT = os.getenv(
     "DATABRICKS_CLAUDE_ENDPOINT", "databricks-claude-opus-4-7"
 )
@@ -94,6 +99,30 @@ def call_demo(question: str, segment: dict[str, Any]) -> str:
     )
 
 
+def call_workers_proxy(question: str, segment: dict[str, Any]) -> str:
+    url = WORKERS_CHAT_URL or os.getenv(
+        "WORKERS_CHAT_FALLBACK",
+        "https://ap-fi-genie-chat.huyun0317.workers.dev",
+    )
+    body = json.dumps({"question": question, "segment": segment}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Workers chat HTTP {exc.code}: {detail}") from exc
+    answer = data.get("answer")
+    if not answer:
+        raise RuntimeError(data.get("error") or "Workers chat returned no answer")
+    return str(answer)
+
+
 def call_serving(question: str, segment: dict[str, Any]) -> str:
     from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
@@ -156,11 +185,14 @@ class UIHandler(SimpleHTTPRequestHandler):
         try:
             if DEMO_MODE:
                 reply = call_demo(question, segment)
+                mode = "demo"
+            elif WORKERS_MODE or WORKERS_CHAT_URL:
+                reply = call_workers_proxy(question, segment)
+                mode = "workers-ai"
             else:
                 reply = call_serving(question, segment)
-            body = json.dumps({"answer": reply, "mode": "demo" if DEMO_MODE else "serving"}).encode(
-                "utf-8",
-            )
+                mode = "serving"
+            body = json.dumps({"answer": reply, "mode": mode}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -184,6 +216,8 @@ def main() -> None:
     if DEMO_MODE:
         print("Chat API: POST /api/chat (DEMO_MODE=public — synthetic Genie rules)")
         print(f"Open: http://{host}:{DEFAULT_PORT}/genie-demo.html")
+    elif WORKERS_MODE or WORKERS_CHAT_URL:
+        print(f"Chat API: POST /api/chat (Workers AI proxy → {WORKERS_CHAT_URL or 'default'})")
     else:
         print(f"Chat API: POST /api/chat (endpoint={DEFAULT_ENDPOINT})")
     server.serve_forever()
