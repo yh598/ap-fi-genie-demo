@@ -186,7 +186,7 @@ class UIHandler(SimpleHTTPRequestHandler):
             if DEMO_MODE:
                 reply = call_demo(question, segment)
                 mode = "demo"
-            elif WORKERS_MODE or WORKERS_CHAT_URL:
+            elif WORKERS_MODE:
                 reply = call_workers_proxy(question, segment)
                 mode = "workers-ai"
             else:
@@ -216,7 +216,7 @@ def main() -> None:
     if DEMO_MODE:
         print("Chat API: POST /api/chat (DEMO_MODE=public — synthetic Genie rules)")
         print(f"Open: http://{host}:{DEFAULT_PORT}/genie-demo.html")
-    elif WORKERS_MODE or WORKERS_CHAT_URL:
+    elif WORKERS_MODE:
         print(f"Chat API: POST /api/chat (Workers AI proxy → {WORKERS_CHAT_URL or 'default'})")
     else:
         print(f"Chat API: POST /api/chat (endpoint={DEFAULT_ENDPOINT})")

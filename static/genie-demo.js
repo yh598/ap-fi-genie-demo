@@ -243,10 +243,39 @@ async function requestChat(question, segment) {
   return { error: lastErr };
 }
 
-function formatUnits(w, scaleK) {
-  const v = w.a || w.f;
+function formatUnits(v, scaleK) {
   if (scaleK) return `${Math.round(v)}K`;
-  return `${v.toFixed ? v.toFixed(1) : v}K`;
+  return `${Number(v).toFixed(1)}K`;
+}
+
+function formatTotalK(v, scaleK) {
+  if (scaleK && v >= 1000) return `${(v / 1000).toFixed(2)}M`;
+  return formatUnits(v, scaleK);
+}
+
+function cellActual(w, scaleK) {
+  if (!w.a) return "—";
+  return formatUnits(w.a, scaleK);
+}
+
+function cellForecast(w, scaleK) {
+  if (!w.f) return "—";
+  return formatUnits(w.f, scaleK);
+}
+
+function kpisFromSeries(series, scaleK, template) {
+  const actualSum = series.reduce((s, w) => s + w.a, 0);
+  const forward = series.filter((w) => w.f > 0);
+  const forward8 = forward.slice(0, 8).reduce((s, w) => s + w.f, 0);
+  const out = template.map((k) => ({ ...k }));
+  out[0] = { ...out[0], value: formatTotalK(actualSum, scaleK) };
+  if (out[1].label.toLowerCase().includes("forward 8")) {
+    out[1] = { ...out[1], value: formatTotalK(forward8, scaleK) };
+  } else if (out[1].label.toLowerCase().includes("peak week")) {
+    const peak = forward.reduce((b, w) => (w.f > b.f ? w : b), forward[0]);
+    out[1] = { ...out[1], value: formatUnits(peak.f, scaleK), delta: `${peak.week} seasonal lift` };
+  }
+  return out;
 }
 
 function renderBars(data, scaleK) {
@@ -256,7 +285,7 @@ function renderBars(data, scaleK) {
     .map((w) => {
       const ah = w.a ? Math.round((w.a / max) * 132) : 0;
       const fh = w.f ? Math.round((w.f / max) * 132) : 0;
-      const label = formatUnits(w, scaleK);
+      const label = formatUnits(w.a || w.f, scaleK);
       const settled = w.a ? "actual" : "forecast";
       return `<div class="bar-wrap" title="${w.week}: ${label} (${settled})">
         <div class="bar-stack">
@@ -272,7 +301,8 @@ function renderBars(data, scaleK) {
 function renderKpis(meta) {
   const row = document.getElementById("kpi-row");
   if (!row) return;
-  row.innerHTML = meta.kpis
+  const cards = meta.kpis || [];
+  row.innerHTML = cards
     .map(
       (k) => `<article class="kpi">
         <p class="kpi-label">${escapeHtml(k.label)}</p>
@@ -295,10 +325,9 @@ function renderWeeklyTable(data, scaleK) {
   const el = document.getElementById("weekly-table");
   if (!el) return;
   const rows = data
-    .slice(-6)
     .map((w) => {
-      const actual = w.a ? formatUnits(w, scaleK) : "—";
-      const fc = w.f ? formatUnits(w, scaleK) : "—";
+      const actual = cellActual(w, scaleK);
+      const fc = cellForecast(w, scaleK);
       return `<tr><td>${w.week}</td><td class="num">${actual}</td><td class="num">${fc}</td></tr>`;
     })
     .join("");
@@ -324,14 +353,18 @@ function renderDashboard() {
     profile.dataset.tone = viewMeta.demand_profile.toLowerCase().includes("volatile") ? "volatile" : "stable";
   }
 
-  renderKpis(viewMeta);
+  const scaleK = tab === "midlevel" && midView !== "vomero";
+  const series = tab === "midlevel" ? activeWeeklySeries() : [];
+  const kpis =
+    tab === "midlevel" && series.length
+      ? kpisFromSeries(series, scaleK, viewMeta.kpis)
+      : viewMeta.kpis;
+  renderKpis({ ...viewMeta, kpis });
   renderFilters(viewMeta);
 
   if (tab === "midlevel") {
     midlevelBlock.hidden = false;
     scBlock.hidden = true;
-    const scaleK = midView !== "vomero";
-    const series = activeWeeklySeries();
     renderBars(series, scaleK);
     renderWeeklyTable(series, scaleK);
   } else {

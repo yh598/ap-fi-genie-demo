@@ -11,11 +11,6 @@
       <div>
         <p class="eyebrow">North America · HO2026 UAT preview</p>
         <h1>AP Forecast Intelligence — marketplace dashboard + assistant</h1>
-        <p class="lead">
-          Lakeview-style midlevel and style-color views with governed Genie chat. On Render, chat
-          uses <code>POST /api/chat</code> (Claude via Databricks serving when not in
-          <code>DEMO_MODE=public</code>).
-        </p>
       </div>
       <div class="badges">
         <span class="badge">HO2026 · North America</span>
@@ -40,12 +35,18 @@
           <div id="midlevel-block">
             <div class="chart-panel">
               <div class="legend">
-                <span>■ Actual (settled weeks)</span>
-                <span>■ Forecast (forward weeks)</span>
+                <span class="legend-item"
+                  ><span class="legend-swatch actual" aria-hidden="true"></span> Actual (settled
+                  weeks)</span
+                >
+                <span class="legend-item"
+                  ><span class="legend-swatch forecast" aria-hidden="true"></span> Forecast (forward
+                  weeks)</span
+                >
               </div>
               <div class="chart-bars" id="weekly-chart"></div>
             </div>
-            <div class="weekly-table" id="weekly-table" aria-label="Recent weekly actuals and forecast"></div>
+            <div class="weekly-table" id="weekly-table" aria-label="Weekly actuals and forecast"></div>
           </div>
           <div id="style-color-block" hidden>
             <p class="meta">Monthly seasonality index (synthetic)</p>
