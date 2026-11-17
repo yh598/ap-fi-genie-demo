@@ -286,9 +286,32 @@ body {
   font-size: 0.78rem;
 }
 
+.weekly-table-caption {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #344054;
+}
+
+.weekly-table-scroll {
+  max-height: min(22rem, 42vh);
+  overflow-y: auto;
+  border: 1px solid #eaecf0;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .weekly-table table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.weekly-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f9fafb;
+  box-shadow: 0 1px 0 #eaecf0;
 }
 
 .weekly-table th,
@@ -324,10 +347,12 @@ body {
 }
 
 .legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  display: inline-block;
+  width: 22px;
+  height: 12px;
+  border-radius: 2px 2px 0 0;
   flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .legend-swatch.actual {

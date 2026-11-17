@@ -331,7 +331,15 @@ function renderWeeklyTable(data, scaleK) {
       return `<tr><td>${w.week}</td><td class="num">${actual}</td><td class="num">${fc}</td></tr>`;
     })
     .join("");
-  el.innerHTML = `<table><thead><tr><th>Week</th><th>Actual</th><th>Forecast</th></tr></thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = `<p class="weekly-table-caption">All weeks · W28–W43</p>
+    <div class="weekly-table-scroll">
+      <table>
+        <thead><tr><th>Week</th><th>Actual</th><th>Forecast</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  const scroll = el.querySelector(".weekly-table-scroll");
+  if (scroll) scroll.scrollTop = 0;
 }
 
 function renderDashboard() {
