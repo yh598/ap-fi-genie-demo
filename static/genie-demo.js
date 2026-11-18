@@ -237,9 +237,10 @@ let thread = [
   {
     role: "bot",
     text:
-      "AP Intelligence prototype — demand, supply, disaggregation, assignment gaps, and assortment signals (synthetic). Live Genie when /api/chat is wired.",
+      "Ask about anything on the dashboard — demand, WOS, assignment, assortment. Answers come from the integrated planning agent when Databricks serving is configured.",
   },
 ];
+let agentChatMode = "unknown";
 let chatBusy = false;
 
 const REFUSAL_FORECAST_OVERRIDE =
@@ -532,7 +533,7 @@ async function requestChat(question, segment) {
         body: JSON.stringify({ question, segment }),
       });
       const { data, status } = await parseResponse(res);
-      if (res.ok && data.answer) return { answer: data.answer, via: url };
+      if (res.ok && data.answer) return { answer: data.answer, via: url, mode: data.mode || "unknown" };
       if (status === 405 || status === 404) {
         lastErr = data.error || `HTTP ${status} at ${url}`;
         continue;
@@ -1079,13 +1080,50 @@ function formatBot(text) {
   return escapeHtml(text).replace(/\n/g, "<br>");
 }
 
+function agentModeLabel(mode) {
+  const labels = {
+    serving: "Agent · Databricks LLM",
+    "demo-fallback": "Agent · rules (LLM unavailable)",
+    demo: "Agent · demo rules",
+    "workers-ai": "Agent · Workers AI",
+    "browser-fallback": "Browser · rules fallback",
+    "browser-static": "Browser · static demo",
+    unknown: "Agent · unknown",
+  };
+  return labels[mode] || `Agent · ${mode}`;
+}
+
+function setAgentStatusLabel(mode) {
+  agentChatMode = mode;
+  const el = document.getElementById("agent-status");
+  if (!el) return;
+  el.textContent = agentModeLabel(mode);
+  el.dataset.mode = mode;
+}
+
+async function refreshAgentStatus() {
+  try {
+    const res = await fetch("/api/agent/status");
+    if (!res.ok) throw new Error("status");
+    const st = await res.json();
+    const mode = st.chat_mode || "unknown";
+    const extra = st.databricks_configured ? "" : " (no Databricks creds on server)";
+    setAgentStatusLabel(mode);
+    const el = document.getElementById("agent-status");
+    if (el) el.textContent = `${agentModeLabel(mode)}${extra}`;
+  } catch {
+    setAgentStatusLabel("unknown");
+  }
+}
+
 function renderThread() {
   const el = document.getElementById("chat-thread");
   el.innerHTML = thread
     .map((m) => {
       const cls = `bubble ${m.role}${m.loading ? " loading" : ""}${m.error ? " error" : ""}`;
       const inner = m.role === "user" ? escapeHtml(m.text) : formatBot(m.text);
-      return `<div class="${cls}">${inner}</div>`;
+      const foot = m.mode && m.role === "bot" && !m.loading ? `<p class="msg-mode">${escapeHtml(agentModeLabel(m.mode))}</p>` : "";
+      return `<div class="${cls}">${inner}${foot}</div>`;
     })
     .join("");
   el.scrollTop = el.scrollHeight;
@@ -1129,25 +1167,26 @@ async function send(text) {
   const useStaticOnly =
     window.__FI_STATIC_DEMO__ === true || new URLSearchParams(location.search).get("static") === "1";
 
-  const finish = (text, isError = false) => {
+  const finish = (text, isError = false, mode = "") => {
     thread.pop();
-    thread.push({ role: "bot", text, ...(isError ? { error: true } : {}) });
+    thread.push({ role: "bot", text, ...(isError ? { error: true } : {}), ...(mode ? { mode } : {}) });
+    if (mode) setAgentStatusLabel(mode);
   };
 
   try {
     if (useStaticOnly && local) {
       await new Promise((r) => setTimeout(r, 400));
-      finish(local);
+      finish(local, false, "browser-static");
     } else if (!useStaticOnly) {
       const llm = await requestChat(q, ctx);
-      if (llm.answer) finish(llm.answer);
-      else if (local) finish(local);
+      if (llm.answer) finish(llm.answer, false, llm.mode || "serving");
+      else if (local) finish(`${local}\n\n(Server unreachable — browser rules.)`, false, "browser-fallback");
       else finish(llm.error || "Could not reach chat API.", true);
     } else {
       finish(local || "Try a planning chip on the right.");
     }
   } catch (_err) {
-    finish(local || "Could not reach chat API.", true);
+    finish(local ? `${local}\n\n(Server error — browser rules.)` : "Could not reach chat API.", !local, "browser-fallback");
   } finally {
     chatBusy = false;
     setComposer(true);
@@ -1185,6 +1224,7 @@ function init() {
   });
 
   bindDemoApproveChrome();
+  void refreshAgentStatus();
   renderDashboard();
   renderThread();
 }

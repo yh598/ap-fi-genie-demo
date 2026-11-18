@@ -3,10 +3,13 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY chat_server.py demo_genie_responses.py .
+COPY chat_server.py ap_intelligence_agent.py demo_genie_responses.py .
 COPY static ./static
 
-ENV DEMO_MODE=public
+ENV DEMO_MODE=off
+ENV CHAT_FALLBACK_DEMO=1
+ENV DATABRICKS_HOST=https://nike-sole-react.cloud.databricks.com
+ENV DATABRICKS_CLAUDE_ENDPOINT=databricks-claude-opus-4-7
 
 ENV HOST=0.0.0.0
 EXPOSE 8000

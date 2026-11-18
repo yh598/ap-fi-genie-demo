@@ -383,8 +383,29 @@ body {
 }
 
 .chat-header h2 {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-size: 1rem;
+}
+
+.agent-status {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  color: #667085;
+}
+
+.agent-status[data-mode="serving"] {
+  color: #027a48;
+}
+
+.agent-status[data-mode="demo"],
+.agent-status[data-mode="demo-fallback"] {
+  color: #b54708;
+}
+
+.msg-mode {
+  margin: 8px 0 0;
+  font-size: 0.65rem;
+  color: #98a2b3;
 }
 
 .chips {

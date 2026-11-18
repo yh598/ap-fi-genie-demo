@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve AP Forecast Intelligence UI + POST /api/chat via Databricks model serving."""
+"""Serve AP Intelligence UI + planning agent at POST /api/chat."""
 
 from __future__ import annotations
 
@@ -7,11 +7,17 @@ import json
 import os
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Any
+
+from ap_intelligence_agent import (
+    DEFAULT_ENDPOINT,
+    SYSTEM_PROMPT,
+    agent_status,
+    build_serving_user_message,
+    run_agent,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEFAULT_PORT = int(os.getenv("PORT", "8000"))
@@ -19,20 +25,6 @@ _CHAT_MODE = os.getenv("DEMO_MODE", "").strip().lower()
 DEMO_MODE = _CHAT_MODE in ("1", "true", "public", "yes")
 WORKERS_MODE = _CHAT_MODE in ("workers", "workers_ai", "cloudflare")
 WORKERS_CHAT_URL = os.getenv("WORKERS_CHAT_URL", "").strip()
-DEFAULT_ENDPOINT = os.getenv(
-    "DATABRICKS_CLAUDE_ENDPOINT", "databricks-claude-opus-4-7"
-)
-
-SYSTEM_PROMPT = """You are the AP Forecast Intelligence assistant for Nike marketplace planners (Genie-style).
-Answer in clear business language (2–4 short paragraphs, no markdown tables).
-
-Rules:
-- Use only the dashboard context JSON in the user message (synthetic UAT demo on public hosts).
-- Explain NDDC vs NMP, net demand vs net sales, MCCF when relevant.
-- Unconstrained demand is for planning — not o9 supply, receipts, or inventory actions.
-- Do not invent numbers beyond the supplied context.
-- Do not recommend forecast overrides, replenishment, allocation, or commercial decisions.
-"""
 
 
 def message_content(response: Any) -> str:
@@ -73,7 +65,6 @@ def workspace_client():
         return WorkspaceClient()
 
     host, token = _access_token()
-    # ponytail: SDK re-reads profile from env and breaks PAT/OAuth token auth
     saved = {
         k: os.environ.pop(k)
         for k in ("DATABRICKS_CONFIG_PROFILE", "DATABRICKS_PROFILE", "DATABRICKS_AUTH_TYPE")
@@ -85,21 +76,16 @@ def workspace_client():
         os.environ.update(saved)
 
 
-def call_demo(question: str, segment: dict[str, Any]) -> str:
+def call_demo(question: str, segment: dict[str, Any]) -> str | None:
     from demo_genie_responses import answer
 
-    hit = answer(question, segment)
-    if hit:
-        return hit
-    return (
-        "This public demo matches the standard Genie walkthrough prompts (Analytics 101, "
-        "Vomero NDDC trend, NMP Running MCCF trend, style-color seasonality, and planning "
-        "refusals). Use a demo chip or rephrase along those lines. Synthetic data only — "
-        "not live Forecast Intelligence SQL."
-    )
+    return answer(question, segment)
 
 
 def call_workers_proxy(question: str, segment: dict[str, Any]) -> str:
+    import urllib.error
+    import urllib.request
+
     url = WORKERS_CHAT_URL or os.getenv(
         "WORKERS_CHAT_FALLBACK",
         "https://ap-fi-genie-chat.huyun0317.workers.dev",
@@ -111,12 +97,8 @@ def call_workers_proxy(question: str, segment: dict[str, Any]) -> str:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError(f"Workers chat HTTP {exc.code}: {detail}") from exc
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
     answer = data.get("answer")
     if not answer:
         raise RuntimeError(data.get("error") or "Workers chat returned no answer")
@@ -126,10 +108,7 @@ def call_workers_proxy(question: str, segment: dict[str, Any]) -> str:
 def call_serving(question: str, segment: dict[str, Any]) -> str:
     from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
-    user_body = (
-        f"Selected segment context (synthetic demo UI):\n{json.dumps(segment, indent=2)}\n\n"
-        f"Planner question:\n{question}"
-    )
+    user_body = build_serving_user_message(question, segment)
     client = workspace_client()
     response = client.serving_endpoints.query(
         name=DEFAULT_ENDPOINT,
@@ -137,7 +116,7 @@ def call_serving(question: str, segment: dict[str, Any]) -> str:
             ChatMessage(role=ChatMessageRole.SYSTEM, content=SYSTEM_PROMPT),
             ChatMessage(role=ChatMessageRole.USER, content=user_body),
         ],
-        max_tokens=700,
+        max_tokens=900,
     )
     return message_content(response)
 
@@ -147,7 +126,7 @@ class UIHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
-        if args and args[0].startswith("GET /api"):
+        if args and str(args[0]).startswith("GET /api"):
             return
         super().log_message(format, *args)
 
@@ -158,7 +137,16 @@ class UIHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
-        if DEMO_MODE and self.path.split("?", 1)[0] in ("", "/"):
+        path = self.path.split("?", 1)[0]
+        if path == "/api/agent/status":
+            body = json.dumps(agent_status()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if DEMO_MODE and path in ("", "/"):
             self.path = "/genie-demo.html"
         return super().do_GET()
 
@@ -183,15 +171,15 @@ class UIHandler(SimpleHTTPRequestHandler):
             self.send_error(400, "question required")
             return
         try:
-            if DEMO_MODE:
-                reply = call_demo(question, segment)
-                mode = "demo"
-            elif WORKERS_MODE:
-                reply = call_workers_proxy(question, segment)
-                mode = "workers-ai"
-            else:
-                reply = call_serving(question, segment)
-                mode = "serving"
+            reply, mode = run_agent(
+                question,
+                segment,
+                call_serving=call_serving,
+                call_workers=call_workers_proxy,
+                call_demo=call_demo,
+                demo_mode=DEMO_MODE,
+                workers_mode=WORKERS_MODE,
+            )
             body = json.dumps({"answer": reply, "mode": mode}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -212,14 +200,16 @@ def main() -> None:
         sys.exit(f"Missing static dir: {STATIC_DIR}")
     host = os.getenv("HOST", "0.0.0.0")
     server = ThreadingHTTPServer((host, DEFAULT_PORT), UIHandler)
+    st = agent_status()
     print(f"Serving {STATIC_DIR} at http://{host}:{DEFAULT_PORT}/")
+    print(f"Agent status: {json.dumps(st)}")
+    print(f"Open: http://{host}:{DEFAULT_PORT}/genie-demo.html")
     if DEMO_MODE:
-        print("Chat API: POST /api/chat (DEMO_MODE=public — synthetic Genie rules)")
-        print(f"Open: http://{host}:{DEFAULT_PORT}/genie-demo.html")
+        print("Chat: rule-based DEMO_MODE=public")
     elif WORKERS_MODE:
-        print(f"Chat API: POST /api/chat (Workers AI proxy → {WORKERS_CHAT_URL or 'default'})")
+        print(f"Chat: Workers proxy → {WORKERS_CHAT_URL or 'default'}")
     else:
-        print(f"Chat API: POST /api/chat (endpoint={DEFAULT_ENDPOINT})")
+        print(f"Chat: Databricks serving → {DEFAULT_ENDPOINT}")
     server.serve_forever()
 
 

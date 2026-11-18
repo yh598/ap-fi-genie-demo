@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AP Intelligence — planner prototype</title>
-    <link rel="stylesheet" href="genie-demo.css?v=8" />
+    <link rel="stylesheet" href="genie-demo.css?v=9" />
   </head>
   <body>
     <header class="top">
@@ -129,7 +129,10 @@
         </article>
       </section>
       <aside class="pane-chat" aria-label="Planning assistant">
-        <div class="chat-header"><h2>Planning assistant</h2></div>
+        <div class="chat-header">
+          <h2>Planning assistant</h2>
+          <p class="agent-status" id="agent-status">Agent: connecting…</p>
+        </div>
         <div class="chips" id="prompt-chips"></div>
         <div class="thread" id="chat-thread"></div>
         <form class="composer" id="chat-form">
@@ -147,6 +150,6 @@
         <button type="submit" class="btn-approve-demo" value="confirm">Confirm demo approve</button>
       </form>
     </dialog>
-    <script src="genie-demo.js?v=8"></script>
+    <script src="genie-demo.js?v=9"></script>
   </body>
 </html>
