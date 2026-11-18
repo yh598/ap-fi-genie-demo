@@ -14,11 +14,7 @@ services:
       - key: DEMO_MODE
         value: "off"
       - key: CHAT_PROVIDER
-        value: groq
-      - key: GROQ_MODEL
-        value: llama-3.1-8b-instant
-      - key: GROQ_API_KEY
-        sync: false
+        value: databricks
       - key: CHAT_FALLBACK_DEMO
         value: "1"
       - key: DATABRICKS_TOKEN
