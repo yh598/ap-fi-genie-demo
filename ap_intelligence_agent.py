@@ -27,17 +27,41 @@ Behavior:
 """
 
 
+def _chat_provider() -> str:
+    explicit = os.getenv("CHAT_PROVIDER", "").strip().lower()
+    if explicit:
+        return explicit
+    demo = os.getenv("DEMO_MODE", "").strip().lower()
+    if demo in ("1", "true", "public", "yes"):
+        return "demo"
+    if demo in ("workers", "workers_ai", "cloudflare"):
+        return "workers"
+    if demo in ("groq", "oss", "open"):
+        return "groq"
+    if os.getenv("GROQ_API_KEY", "").strip():
+        return "groq"
+    return "databricks"
+
+
 def agent_status() -> dict[str, Any]:
-    demo = os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "public", "yes")
-    workers = os.getenv("DEMO_MODE", "").strip().lower() in ("workers", "workers_ai", "cloudflare")
+    provider = _chat_provider()
     has_token = bool(os.getenv("DATABRICKS_TOKEN", "").strip())
     has_sp = bool(os.getenv("DATABRICKS_CLIENT_ID", "").strip())
-    mode = "demo" if demo else "workers-ai" if workers else "serving"
+    groq = bool(os.getenv("GROQ_API_KEY", "").strip())
+    mode_map = {
+        "demo": "demo",
+        "workers": "workers-ai",
+        "groq": "groq-oss",
+        "databricks": "serving",
+    }
     return {
         "agent": "ap-intelligence",
-        "chat_mode": mode,
+        "chat_mode": mode_map.get(provider, provider),
+        "chat_provider": provider,
         "serving_endpoint": DEFAULT_ENDPOINT,
+        "oss_model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
         "databricks_configured": has_token or has_sp,
+        "groq_configured": groq,
         "fallback_rules_enabled": os.getenv("CHAT_FALLBACK_DEMO", "1").strip() != "0",
     }
 
@@ -48,9 +72,11 @@ def run_agent(
     *,
     call_serving,
     call_workers,
+    call_groq,
     call_demo,
     demo_mode: bool,
     workers_mode: bool,
+    groq_mode: bool,
 ) -> tuple[str, str]:
     """Return (answer_text, mode_label)."""
     if demo_mode:
@@ -58,6 +84,20 @@ def run_agent(
 
     if workers_mode:
         return str(call_workers(question, segment)), "workers-ai"
+
+    if groq_mode:
+        try:
+            return str(call_groq(question, segment)), "groq-oss"
+        except Exception as exc:
+            if os.getenv("CHAT_FALLBACK_DEMO", "1").strip() == "0":
+                raise
+            ruled = call_demo(question, segment)
+            if ruled:
+                return ruled, "demo-fallback"
+            return (
+                f"I could not reach Groq ({os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant')}): {exc}. "
+                "Set GROQ_API_KEY on the server (free tier at console.groq.com)."
+            ), "error-fallback"
 
     try:
         return str(call_serving(question, segment)), "serving"

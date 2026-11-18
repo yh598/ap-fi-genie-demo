@@ -1086,6 +1086,7 @@ function agentModeLabel(mode) {
     "demo-fallback": "Agent · rules (LLM unavailable)",
     demo: "Agent · demo rules",
     "workers-ai": "Agent · Workers AI",
+    "groq-oss": "Agent · Llama (Groq)",
     "browser-fallback": "Browser · rules fallback",
     "browser-static": "Browser · static demo",
     unknown: "Agent · unknown",
