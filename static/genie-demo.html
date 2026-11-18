@@ -3,67 +3,150 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AP Forecast Intelligence — Genie demo</title>
-    <link rel="stylesheet" href="genie-demo.css?v=3" />
+    <title>AP Intelligence — planner prototype</title>
+    <link rel="stylesheet" href="genie-demo.css?v=8" />
   </head>
   <body>
     <header class="top">
       <div>
-        <p class="eyebrow">North America · HO2026 UAT preview</p>
-        <h1>AP Forecast Intelligence — marketplace dashboard + assistant</h1>
+        <p class="eyebrow">North America · HO2026 · synthetic vision prototype</p>
+        <h1>AP Intelligence — demand, supply &amp; planning insights</h1>
       </div>
       <div class="badges">
         <span class="badge">HO2026 · North America</span>
         <span class="badge profile-chip" id="demand-profile">Stable</span>
+        <span class="badge profile-chip confidence-chip" id="confidence-badge">High data sufficiency</span>
+        <span class="badge badge-muted">Insight only · no execution</span>
       </div>
     </header>
     <main class="split">
-      <section class="pane-dash" aria-label="Synthetic dashboard">
+      <section class="pane-dash" aria-label="Planner workspace">
         <div class="dash-toolbar">
-          <span>Workspace: <strong>Forecast Intelligence · NA</strong></span>
-          <span>Last refreshed: synthetic · Nov 2026</span>
+          <span>Workspace: <strong>AP Intelligence · NA</strong></span>
+          <span id="toolbar-lens-label">National assortment planning</span>
+        </div>
+        <p class="scope-banner">
+          Planner workspace only — no model training, pipeline monitoring, or SNLE / ERP writes (per FI vs eng scope split).
+        </p>
+        <div class="lens-row" role="group" aria-label="Planning horizon">
+          <span class="lens-label">Planning lens</span>
+          <button type="button" class="lens-btn active" data-lens="national" id="lens-national">
+            National AP (long-term)
+          </button>
+          <button type="button" class="lens-btn" data-lens="store" id="lens-store">
+            Store &amp; retailer (mid-term)
+          </button>
         </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="midlevel" role="tab">Midlevel</button>
-          <button type="button" class="tab" data-tab="style_color" role="tab">Style Color</button>
+          <button type="button" class="tab active" data-tab="midlevel" role="tab">Demand &amp; supply</button>
+          <button type="button" class="tab" data-tab="style_colors" role="tab">Style colors</button>
+          <button type="button" class="tab" data-tab="assignment" role="tab">Assignment</button>
         </div>
+        <div class="hierarchy-bar" id="hierarchy-bar" hidden></div>
         <div class="filters" id="filter-row" aria-label="Segment filters"></div>
         <div class="kpi-row" id="kpi-row"></div>
         <article class="card">
-          <h2 id="dash-title">Vomero · US · NDDC</h2>
+          <h2 id="dash-title">Vomero · United States · NDDC</h2>
           <p class="meta" id="dash-meta">Mid-level · HO2026</p>
+
           <div id="midlevel-block">
+            <details class="model-onion" id="model-onion-mid" open>
+              <summary>Model path (explain-only)</summary>
+              <ol class="onion-steps" id="model-path-mid"></ol>
+            </details>
+            <div class="chart-toolbar">
+              <span class="chart-mode-label" id="chart-range-caption">Weekly demand · 3 years</span>
+              <div class="chart-toggles">
+                <div class="chart-toggle" role="group" aria-label="History range">
+                  <button type="button" class="chart-type-btn active" data-range="3y">3Y</button>
+                  <button type="button" class="chart-type-btn" data-range="1y">1Y</button>
+                  <button type="button" class="chart-type-btn" data-range="season">HO2026</button>
+                </div>
+              </div>
+            </div>
             <div class="chart-panel">
               <div class="legend">
                 <span class="legend-item"
-                  ><span class="legend-swatch actual" aria-hidden="true"></span> Actual (settled
-                  weeks)</span
+                  ><span class="legend-swatch actual" aria-hidden="true"></span> Actual (bars + line)</span
                 >
                 <span class="legend-item"
-                  ><span class="legend-swatch forecast" aria-hidden="true"></span> Forecast (forward
-                  weeks)</span
+                  ><span class="legend-swatch forecast" aria-hidden="true"></span> Forecast (bars + line)</span
+                >
+                <span class="legend-item"
+                  ><span class="legend-swatch history" aria-hidden="true"></span> Prior season (LY)</span
                 >
               </div>
-              <div class="chart-bars" id="weekly-chart"></div>
+              <div class="chart-scroll" id="chart-scroll">
+                <div class="chart-combined" id="weekly-chart-combined"></div>
+              </div>
             </div>
+            <section class="insight-card" id="planner-insight" aria-live="polite"></section>
             <div class="weekly-table" id="weekly-table" aria-label="Weekly actuals and forecast"></div>
+            <section class="supply-panel" id="supply-panel" aria-label="Inventory and weeks of supply">
+              <div class="supply-head">
+                <h3>Supply · inventory &amp; allocation</h3>
+                <p class="meta supply-sub">Read-only · weeks of supply vs forward demand</p>
+              </div>
+              <div class="supply-kpis" id="supply-kpis"></div>
+              <div class="wos-alert" id="wos-alert" hidden role="status"></div>
+              <div class="alloc-table-wrap" id="alloc-by-geo"></div>
+              <div id="store-inventory-block" hidden>
+                <p class="weekly-table-caption">Store &amp; door inventory (synthetic grid)</p>
+                <div class="alloc-table-wrap store-scroll" id="store-inventory-table"></div>
+              </div>
+              <p class="note supply-foot">
+                WOS target: <strong id="wos-threshold-label">10</strong> weeks
+                <span id="wos-lens-hint"> (national)</span> · o9 plan shown as allocated qty
+              </p>
+            </section>
+            <section class="insight-card assortment-panel" id="assortment-panel" aria-label="Assortment signals">
+              <div id="assortment-ranked"></div>
+              <div class="approve-row" id="assortment-approve-row" hidden>
+                <button type="button" class="btn-approve-demo" id="btn-approve-assortment">Approve assortment pack (demo → SNOP)</button>
+              </div>
+            </section>
           </div>
-          <div id="style-color-block" hidden>
-            <p class="meta">Monthly seasonality index (synthetic)</p>
-            <div class="season-grid" id="season-grid"></div>
+
+          <div id="style-colors-block" hidden>
+            <p class="meta">Disaggregation · SC share × mid-level forward run rate (synthetic)</p>
+            <details class="model-onion" open>
+              <summary>How SC forecasts tie to mid-level</summary>
+              <p class="onion-caption" id="disagg-formula"></p>
+            </details>
+            <div class="sc-table-wrap" id="sc-disagg-table"></div>
+            <section class="sc-detail" id="sc-detail-panel" aria-label="Selected style-color"></section>
+          </div>
+
+          <div id="assignment-block" hidden>
+            <p class="meta">Assignment insights · demand vs o9 plan (read-only)</p>
+            <div class="wos-alert assignment-intro" id="assignment-intro"></div>
+            <div class="alloc-table-wrap" id="assignment-table"></div>
+            <div class="approve-row">
+              <button type="button" class="btn-approve-demo" id="btn-approve-assignment-batch">Approve flagged assignments (demo → SNLE)</button>
+            </div>
+            <p class="note">Demo only — no tickets created in SNOP, SNLE, SAP, or o9.</p>
           </div>
         </article>
       </section>
-      <aside class="pane-chat" aria-label="Forecast assistant">
-        <div class="chat-header"><h2>Forecast assistant</h2></div>
+      <aside class="pane-chat" aria-label="Planning assistant">
+        <div class="chat-header"><h2>Planning assistant</h2></div>
         <div class="chips" id="prompt-chips"></div>
         <div class="thread" id="chat-thread"></div>
         <form class="composer" id="chat-form">
-          <input id="chat-input" placeholder="Ask your question…" autocomplete="off" />
+          <input id="chat-input" placeholder="Ask about demand, supply, disagg, assignment…" autocomplete="off" />
           <button type="submit">Send</button>
         </form>
       </aside>
     </main>
-    <script src="genie-demo.js?v=3"></script>
+    <dialog class="approve-dialog" id="approve-dialog" aria-labelledby="approve-dialog-title">
+      <h2 id="approve-dialog-title">Approve planning insight (demo)</h2>
+      <p id="approve-dialog-body"></p>
+      <p class="note">This simulates SNOP / SNLE handoff. No production systems are called.</p>
+      <form method="dialog" class="dialog-actions">
+        <button type="button" class="btn-secondary" value="cancel">Cancel</button>
+        <button type="submit" class="btn-approve-demo" value="confirm">Confirm demo approve</button>
+      </form>
+    </dialog>
+    <script src="genie-demo.js?v=8"></script>
   </body>
 </html>
